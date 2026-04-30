@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🕷️ SPIDER-MAN WEB SHOOTER AR</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=VT323&family=Audiowide&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --red:#FF2244; --gold:#FFD700; --chrome:#C0C0C0;
+  --dim-red:rgba(255,34,68,0.4);
+}
+html,body { width:100%;height:100%;background:#000;overflow:hidden;font-family:'Orbitron',monospace; }
+
+/* CRT scanlines */
+body::after {
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(to bottom,transparent 0px,transparent 2px,rgba(0,0,0,.13) 2px,rgba(0,0,0,.13) 4px);
+}
+
+/* Scene */
+#scene { position:fixed;inset:0; }
+#cam {
+  position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;transform:scaleX(-1);
+  filter:brightness(.42) saturate(.45) contrast(1.25);z-index:1;
+}
+#webCv,#handCv { position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1); }
+#webCv  { z-index:2; }
+#handCv { z-index:3; }
+
+/* HUD */
+#hud { position:fixed;top:20px;left:20px;z-index:100;display:none;flex-direction:column;gap:10px;pointer-events:none; }
+.panel {
+  background:rgba(10,0,0,.88);border:2px solid var(--red);border-radius:3px;
+  padding:9px 16px;box-shadow:0 0 16px var(--dim-red);min-width:220px;
+}
+.row { display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:6px;color:var(--chrome);font-size:.65rem;letter-spacing:1.5px; }
+.row:last-child { margin-bottom:0; }
+.val { font-family:'VT323';font-size:1.25rem;color:var(--red);text-shadow:0 0 6px var(--red); }
+#dot { width:8px;height:8px;border-radius:50%;display:inline-block;background:#f00;box-shadow:0 0 5px #f00;flex-shrink:0;transition:background .3s,box-shadow .3s; }
+#dot.yellow { background:var(--gold);box-shadow:0 0 6px var(--gold);animation:blink .5s infinite; }
+#dot.green  { background:#0f0;box-shadow:0 0 8px #0f0; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.25} }
+
+/* Logo */
+#logo { position:fixed;top:20px;right:22px;z-index:100;text-align:right;pointer-events:none; }
+#logo .t1 { font-family:'Audiowide';font-size:1.5rem;color:var(--red);text-shadow:0 0 12px var(--red); }
+#logo .t2 { font-family:'VT323';font-size:1rem;color:var(--chrome);letter-spacing:3px; }
+
+/* Badge */
+#badge { position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:100;text-align:center;pointer-events:none;opacity:0;transition:opacity .15s; }
+#badge.show { opacity:1; }
+.b-emo  { font-size:3.2rem; }
+.b-word { font-family:'VT323';font-size:3rem;color:#fff;letter-spacing:5px;text-shadow:0 0 14px #fff;line-height:1; }
+
+/* Hint */
+#hint { position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:100;font-family:'VT323';font-size:1.05rem;color:rgba(255,255,255,.35);letter-spacing:2px;white-space:nowrap;pointer-events:none; }
+
+/* Loading */
+#loadOv { position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.93);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px; }
+.spinner { width:52px;height:52px;border:3px solid rgba(223, 16, 47, 0.25);border-top-color:var(--red);border-radius:50%;animation:spin .75s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#loadTxt { font-family:'VT323';font-size:1.9rem;color:var(--gold);letter-spacing:4px; }
+
+/* Start */
+#startOv { position:fixed;inset:0;z-index:600;background:radial-gradient(ellipse at 50% 35%,#2a0000 0%,#000 65%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px; }
+.spider { font-size:5.5rem;animation:bob 2.5s ease-in-out infinite; }
+@keyframes bob { 0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)} }
+.s-title { font-family:'Audiowide';font-size:2rem;color:#fff;letter-spacing:6px;text-shadow:0 0 24px var(--red); }
+.s-sub   { font-family:'VT323';font-size:1.5rem;color:var(--gold);letter-spacing:3px; }
+.s-inst  { margin:14px 0 20px;font-family:'VT323';font-size:1.15rem;color:rgba(255,255,255,.55);text-align:center;line-height:2;letter-spacing:1px; }
+.s-inst b { color:var(--gold); }
+#startBtn { padding:14px 48px;font-family:'Audiowide';font-size:1rem;background:var(--red);color:#fff;border:3px solid var(--gold);letter-spacing:2px;cursor:pointer;box-shadow:0 0 24px rgba(255,34,68,.5);transition:.2s; }
+#startBtn:hover { transform:scale(1.08);box-shadow:0 0 40px var(--red); }
+
+/* Error */
+#errMsg { position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(80,0,0,.96);border:2px solid var(--red);padding:12px 28px;font-family:'VT323';font-size:1.4rem;color:#fff;letter-spacing:2px;text-align:center;max-width:90vw;border-radius:4px;display:none; }
+</style>
+</head>
+<body>
+
+<div id="startOv">
+  <div class="spider">🕷️</div>
+  <div class="s-title">WEB SHOOTER AR</div>
+  <div class="s-sub">CLASSIC EDITION v3.0</div>
+  <div class="s-inst">
+    <b>🤟 SPIDEY SIGN</b> → Shoot webs<br>
+    <b>✊ FIST</b> → Clear all webs<br>
+    Allow camera access when prompted
+  </div>
+  <button id="startBtn">ACTIVATE SPIDER-SENSE</button>
+</div>
+
+<div id="loadOv">
+  <div class="spinner"></div>
+  <div id="loadTxt">LOADING...</div>
+</div>
+
+<div id="hud">
+  <div class="panel">
+    <div class="row"><span><span id="dot"></span>&nbsp;SYSTEM</span><span class="val" id="sysVal">OFFLINE</span></div>
+    <div class="row">SPEED<span class="val" id="fpsVal">--</span></div>
+  </div>
+  <div class="panel">
+    <div class="row">ACTION<span class="val" id="actVal">SCANNING</span></div>
+    <div class="row">WEBS<span class="val" id="webVal">0</span></div>
+  </div>
+</div>
+
+<div id="logo">
+  <div class="t1">SPIDER-MAN</div>
+  <div class="t2">ORIGINAL SERIES</div>
+</div>
+
+<div id="badge">
+  <div class="b-emo" id="bEmo">🤟</div>
+  <div class="b-word" id="bWord">THWIP!</div>
+</div>
+
+<div id="hint">🤟 SPIDEY SIGN = SHOOT &nbsp;|&nbsp; ✊ FIST = CLEAR</div>
+<div id="errMsg"></div>
+
+<div id="scene">
+  <video id="cam" autoplay playsinline muted></video>
+  <canvas id="webCv"></canvas>
+  <canvas id="handCv"></canvas>
+</div>
+
+<script>
+// ── ELEMENTS ────────────────────────────────────────────────────────────────
+const cam    = document.getElementById('cam');
+const webCv  = document.getElementById('webCv');
+const handCv = document.getElementById('handCv');
+const webCtx = webCv.getContext('2d');
+const hCtx   = handCv.getContext('2d');
+const dot    = document.getElementById('dot');
+const sysVal = document.getElementById('sysVal');
+const fpsVal = document.getElementById('fpsVal');
+const actVal = document.getElementById('actVal');
+const webVal = document.getElementById('webVal');
+const badge  = document.getElementById('badge');
+const bEmo   = document.getElementById('bEmo');
+const bWord  = document.getElementById('bWord');
+const errMsg = document.getElementById('errMsg');
+const loadOv = document.getElementById('loadOv');
+const loadTxt= document.getElementById('loadTxt');
+
+// ── CANVAS SIZE ──────────────────────────────────────────────────────────────
+let W = 0, H = 0;
+function resize() {
+  W = innerWidth; H = innerHeight;
+  webCv.width = handCv.width = W;
+  webCv.height= handCv.height= H;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── AUDIO ────────────────────────────────────────────────────────────────────
+let audio = null;
+function initAudio() {
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+}
+function playThwip() {
+  if (!audio) return;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(800, audio.currentTime);
+  o.frequency.exponentialRampToValueAtTime(30, audio.currentTime + 0.13);
+  g.gain.setValueAtTime(0.18, audio.currentTime);
+  g.gain.linearRampToValueAtTime(0, audio.currentTime + 0.13);
+  o.connect(g); g.connect(audio.destination);
+  o.start(); o.stop(audio.currentTime + 0.15);
+}
+function playWhoosh() {
+  if (!audio) return;
+  const len = audio.sampleRate * 0.35;
+  const buf = audio.createBuffer(1, len, audio.sampleRate);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * (1-i/len);
+  const src = audio.createBufferSource();
+  const bpf = audio.createBiquadFilter();
+  const g   = audio.createGain();
+  bpf.type = 'bandpass'; bpf.frequency.value = 900; bpf.Q.value = 0.4;
+  g.gain.setValueAtTime(0.14, audio.currentTime);
+  g.gain.linearRampToValueAtTime(0, audio.currentTime + 0.35);
+  src.buffer = buf;
+  src.connect(bpf); bpf.connect(g); g.connect(audio.destination);
+  src.start();
+}
+
+// ── WEB STATE ────────────────────────────────────────────────────────────────
+// FIX 3: Reduced MAX_T from 2000 → 800 to cap GPU memory pressure
+let threads = [], nodes = [];
+let totalWebs = 0, webOpacity = 1, dissolving = false;
+const MAX_T = 800;
+
+function spawnWeb(ox, oy, dx, dy) {
+  if (threads.length >= MAX_T) {
+    // FIX 2: Trim nodes proportionally to threads so they never diverge
+    const trimCount = 100;
+    const trimRatio = nodes.length / Math.max(threads.length, 1);
+    threads.splice(0, trimCount);
+    nodes.splice(0, Math.ceil(trimCount * trimRatio));
+  }
+  const angle = Math.atan2(dy, dx) + (Math.random()-.5)*0.4;
+  const dist  = 350 + Math.random()*350;
+  const tx = Math.max(10, Math.min(W-10, ox + Math.cos(angle)*dist));
+  const ty = Math.max(10, Math.min(H-10, oy + Math.sin(angle)*dist));
+
+  // Main thread
+  threads.push({
+    x1:ox, y1:oy, x2:tx, y2:ty,
+    cx:(ox+tx)/2 + (Math.random()-.5)*70,
+    cy:(oy+ty)/2 + 25 + Math.random()*50,
+    thick: 1.5 + Math.random()*2.5
+  });
+  nodes.push({x:tx, y:ty});
+
+  // Orb web net at impact
+  const rads = 5 + Math.floor(Math.random()*4);
+  const radius = 50 + Math.random()*70;
+  const netAngles = [];
+
+  for(let i=0; i<rads; i++) {
+    const a = (Math.PI * 2 * i) / rads + (Math.random()-0.5)*0.4;
+    netAngles.push(a);
+    const endX = tx + Math.cos(a) * radius;
+    const endY = ty + Math.sin(a) * radius;
+    threads.push({
+      x1:tx, y1:ty, x2:endX, y2:endY,
+      cx:(tx+endX)/2, cy:(ty+endY)/2,
+      thick: 1 + Math.random()
+    });
+  }
+
+  const spirals = 3 + Math.floor(Math.random()*3);
+  for(let s=1; s<=spirals; s++) {
+    const r = (radius / spirals) * s;
+    for(let i=0; i<rads; i++) {
+      const a1 = netAngles[i];
+      const a2 = netAngles[(i+1)%rads];
+      const px1 = tx + Math.cos(a1)*r;
+      const py1 = ty + Math.sin(a1)*r;
+      const px2 = tx + Math.cos(a2)*r;
+      const py2 = ty + Math.sin(a2)*r;
+      threads.push({
+        x1:px1, y1:py1, x2:px2, y2:py2,
+        cx:(px1+px2)/2, cy:(py1+py2)/2 + r*0.1,
+        thick: 0.5 + Math.random()*0.5
+      });
+    }
+  }
+
+  webVal.textContent = ++totalWebs;
+}
+
+// ── RENDER WEBS ──────────────────────────────────────────────────────────────
+function renderWebs() {
+  if (dissolving) {
+    webOpacity -= 1 / 60;
+    if (webOpacity <= 0) {
+      threads = []; nodes = [];
+      webOpacity = 1; dissolving = false;
+    }
+  }
+  webCtx.clearRect(0, 0, W, H);
+  if (!threads.length) return;
+
+  webCtx.save();
+  webCtx.globalAlpha = webOpacity;
+  webCtx.strokeStyle = '#ffffff';
+  webCtx.lineCap     = 'round';
+
+  // FIX 1a: Set shadowBlur ONCE before the loop, then batch all paths into
+  // a single stroke() call — one GPU blur pass instead of one per thread.
+  webCtx.shadowBlur  = 8;
+  webCtx.shadowColor = 'rgba(180,210,255,0.9)';
+
+  // Group threads by thickness to minimise state changes
+  const byThick = new Map();
+  for (const t of threads) {
+    const key = Math.round(t.thick * 2) / 2; // round to nearest 0.5
+    if (!byThick.has(key)) byThick.set(key, []);
+    byThick.get(key).push(t);
+  }
+  for (const [thick, group] of byThick) {
+    webCtx.lineWidth = thick;
+    webCtx.beginPath();
+    for (const t of group) {
+      webCtx.moveTo(t.x1, t.y1);
+      webCtx.quadraticCurveTo(t.cx, t.cy, t.x2, t.y2);
+    }
+    webCtx.stroke(); // single stroke per thickness group = far fewer blur passes
+  }
+
+  // FIX 1b: Nodes rendered separately with their own (smaller) shadow,
+  // also as one batch fill call.
+  webCtx.shadowBlur  = 6;
+  webCtx.shadowColor = 'rgba(180,210,255,0.9)';
+  webCtx.fillStyle   = 'rgba(220,235,255,0.95)';
+  webCtx.beginPath();
+  for (const n of nodes) {
+    webCtx.moveTo(n.x + 3.5, n.y);
+    webCtx.arc(n.x, n.y, 3.5, 0, Math.PI*2);
+  }
+  webCtx.fill(); // single fill call for all nodes
+
+  webCtx.restore();
+}
+
+// ── GESTURE ──────────────────────────────────────────────────────────────────
+const up = (lms, tip, pip) => lms[tip].y < lms[pip].y;
+function gesture(lms) {
+  const idx = up(lms, 8,  6);
+  const mid = up(lms, 12, 10);
+  const rng = up(lms, 16, 14);
+  const pnk = up(lms, 20, 18);
+  if (idx && pnk && !mid && !rng) return 'SPIDEY';
+  if (!idx && !mid && !rng && !pnk) return 'FIST';
+  return 'NONE';
+}
+const px = lm => ({ x: lm.x * W, y: lm.y * H });
+
+// ── SKELETON ─────────────────────────────────────────────────────────────────
+const BONES = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],
+  [13,17],[17,18],[18,19],[19,20],
+  [0,17]
+];
+
+// ── RENDER HANDS ─────────────────────────────────────────────────────────────
+let shootTimer = 0, badgeTimer = null, lastHands = [];
+
+function showBadge(emo, word) {
+  bEmo.textContent = emo; bWord.textContent = word;
+  badge.classList.add('show');
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => badge.classList.remove('show'), 900);
+}
+
+function renderHands(landmarks) {
+  hCtx.clearRect(0, 0, W, H);
+  if (!landmarks || !landmarks.length) {
+    actVal.textContent = 'SCANNING'; badge.classList.remove('show'); shootTimer = 0; return;
+  }
+  let anySpidey = false, anyFist = false;
+
+  // First pass: check gestures
+  for (const lms of landmarks) {
+    const g = gesture(lms);
+    if (g === 'SPIDEY') anySpidey = true;
+    if (g === 'FIST') anyFist = true;
+  }
+
+  // Update timer based on overall state
+  if (anySpidey && !dissolving) {
+    shootTimer++;
+  } else if (!anySpidey) {
+    shootTimer = 0;
+  }
+
+  // Handle fist logic globally
+  if (anyFist && !dissolving && threads.length > 0) {
+    dissolving = true;
+    playWhoosh();
+  }
+
+  for (const lms of landmarks) {
+    const g  = gesture(lms);
+    const wr = px(lms[0]);
+    const col = g==='SPIDEY' ? '#FF2244' : g==='FIST' ? '#FFD700' : 'rgba(255,255,255,0.65)';
+
+    hCtx.save();
+    hCtx.strokeStyle = col;
+    hCtx.lineWidth   = 3.5;
+    hCtx.lineCap     = 'round';
+    // FIX 1c: shadowBlur set once per hand, not per bone segment
+    hCtx.shadowBlur  = g !== 'NONE' ? 14 : 5;
+    hCtx.shadowColor = col;
+
+    // Batch all bones into one path per hand
+    hCtx.beginPath();
+    for (const [a,b] of BONES) {
+      const p1=px(lms[a]), p2=px(lms[b]);
+      hCtx.moveTo(p1.x,p1.y); hCtx.lineTo(p2.x,p2.y);
+    }
+    hCtx.stroke(); // single stroke for all bones
+
+    // Batch all joint dots into one path per hand
+    hCtx.fillStyle = col;
+    hCtx.beginPath();
+    for (const lm of lms) {
+      const p=px(lm);
+      hCtx.moveTo(p.x + 4.5, p.y);
+      hCtx.arc(p.x,p.y,4.5,0,Math.PI*2);
+    }
+    hCtx.fill(); // single fill for all joints
+
+    hCtx.restore();
+
+    if (g==='SPIDEY' && !dissolving && (shootTimer % 7 === 0)) {
+      const t8=px(lms[8]), t20=px(lms[20]);
+      spawnWeb(t8.x,  t8.y,  t8.x -wr.x, t8.y -wr.y);
+      spawnWeb(t20.x, t20.y, t20.x-wr.x, t20.y-wr.y);
+      playThwip();
+    }
+  }
+
+  if (anySpidey)      { actVal.textContent='THWIP!';   showBadge('🤟','THWIP!'); }
+  else if (anyFist)   { actVal.textContent='CLEARING'; showBadge('✊','CLEAR!'); }
+  else                { actVal.textContent='TRACKING'; }
+}
+
+// ── FPS ──────────────────────────────────────────────────────────────────────
+let fpsT=performance.now(), fpsN=0;
+function tickFPS() {
+  fpsN++;
+  const now=performance.now();
+  if (now-fpsT >= 1000) { fpsVal.textContent=fpsN; fpsN=0; fpsT=now; }
+}
+
+// ── ERROR ────────────────────────────────────────────────────────────────────
+function showError(msg) {
+  errMsg.textContent='⚠ '+msg; errMsg.style.display='block';
+  console.error('[SpiderAR]', msg);
+  setTimeout(()=>{ errMsg.style.display='none'; }, 8000);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  loadOv.style.display = 'flex';
+
+  // Step 1: camera
+  loadTxt.textContent = 'REQUESTING CAMERA...';
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ width:{ideal:1280}, height:{ideal:720}, facingMode:'user' },
+      audio:false
+    });
+  } catch(e) {
+    loadOv.style.display = 'none';
+    if (e.name==='NotAllowedError'||e.name==='PermissionDeniedError')
+      showError('CAMERA DENIED — Allow camera in browser settings then refresh.');
+    else if (e.name==='NotFoundError')
+      showError('NO CAMERA FOUND — Plug in a webcam and refresh.');
+    else
+      showError('CAMERA ERROR: '+e.message);
+    return;
+  }
+
+  cam.srcObject = stream;
+  await new Promise(res => { cam.onloadedmetadata = res; });
+  await cam.play().catch(()=>{});
+
+  // Step 2: MediaPipe Tasks Vision
+  loadTxt.textContent = 'LOADING HAND MODEL...';
+  dot.className = 'yellow';
+
+  let handLandmarker;
+  try {
+    const { HandLandmarker, FilesetResolver } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+    );
+
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate: 'GPU'
+      },
+      runningMode: 'VIDEO',
+      numHands: 2,
+      minHandDetectionConfidence: 0.55,
+      minHandPresenceConfidence:  0.55,
+      minTrackingConfidence:      0.50
+    });
+  } catch(e) {
+    loadOv.style.display = 'none';
+    showError('MODEL FAILED: ' + e.message);
+    console.error(e);
+    return;
+  }
+
+  // Step 3: ready
+  loadOv.style.display = 'none';
+  document.getElementById('hud').style.display = 'flex';
+  dot.className = 'green';
+  sysVal.textContent = 'ONLINE';
+
+  // Main loop
+  let lastTime = -1;
+  function loop() {
+    // FIX 4: Skip all work when tab is backgrounded — browser throttles RAF
+    // anyway but MediaPipe + canvas redraws still consume GPU until fully paused.
+    if (document.hidden) {
+      requestAnimationFrame(loop);
+      return;
+    }
+
+    tickFPS();
+    renderWebs();
+
+    if (cam.currentTime !== lastTime && cam.readyState >= 2) {
+      lastTime = cam.currentTime;
+      try {
+        const res = handLandmarker.detectForVideo(cam, performance.now());
+        lastHands = res.landmarks || [];
+        const n = lastHands.length;
+        if (n > 0) {
+          sysVal.textContent = n + ' HAND' + (n>1?'S':'');
+          dot.className = 'green';
+        } else {
+          sysVal.textContent = 'SEARCHING';
+        }
+      } catch(e) { /* skip frame */ }
+    }
+
+    renderHands(lastHands);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+// ── START ────────────────────────────────────────────────────────────────────
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('startOv').style.display = 'none';
+  initAudio();
+  init();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deepanjali — intro</title>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@100;300;400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --m:#39C5BB;--m2:#86CECB;--pink:#FF7BAC;--lav:#C084FC;
+  --bg:#04070E;--dim:rgba(57,197,187,0.06);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;font-family:'Azeret Mono',monospace;color:#e0f7f6}
+
+/* scanlines */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.08) 3px,rgba(0,0,0,0.08) 4px);
+  pointer-events:none;z-index:50
+}
+
+canvas#bg{position:fixed;inset:0;z-index:0}
+
+/* ── SKIP btn ── */
+#skip{
+  position:fixed;top:24px;right:32px;z-index:200;
+  font-family:'Azeret Mono',monospace;font-size:.65rem;letter-spacing:.2em;
+  color:rgba(57,197,187,.4);background:none;border:1px solid rgba(57,197,187,.2);
+  padding:6px 14px;border-radius:2px;cursor:pointer;transition:all .3s;
+  opacity:0;pointer-events:none;
+}
+#skip.show{opacity:1;pointer-events:all}
+#skip:hover{color:var(--m);border-color:var(--m)}
+
+/* ── STAGE ── */
+#stage{
+  position:fixed;inset:0;z-index:10;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:0;
+}
+
+/* ── TERMINAL HEADER ── */
+#term-header{
+  font-size:.65rem;letter-spacing:.18em;color:rgba(57,197,187,.35);
+  margin-bottom:40px;opacity:0;transition:opacity .5s;
+  display:flex;align-items:center;gap:16px;
+}
+#term-header::before,#term-header::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(57,197,187,.2))}
+#term-header.show{opacity:1}
+
+/* ── LINES CONTAINER ── */
+#lines{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  min-height:320px;justify-content:center;
+}
+
+/* each text line */
+.tline{
+  display:flex;align-items:baseline;gap:0;
+  opacity:0;transform:translateY(6px);
+  transition:opacity .4s ease, transform .4s ease;
+  white-space:nowrap;
+  position:relative;
+}
+.tline.in{opacity:1;transform:translateY(0)}
+
+/* tiny label */
+.tline-label{
+  font-size:.55rem;letter-spacing:.25em;color:rgba(57,197,187,.4);
+  margin-right:14px;min-width:60px;text-align:right;
+  align-self:center;
+}
+
+/* the text itself */
+.tline-text{position:relative;overflow:hidden}
+
+/* char spans */
+.tline-text span{
+  display:inline-block;
+  opacity:0;transform:translateY(12px) skewX(-4deg);
+  transition:opacity .28s ease, transform .28s ease;
+}
+.tline-text span.show{opacity:1;transform:translateY(0) skewX(0)}
+
+/* glitch duplicate */
+.tline-text .ghost{
+  position:absolute;left:0;top:0;pointer-events:none;
+  color:var(--pink);opacity:0;transform:translate(-3px,0);
+  transition:none;filter:blur(0.5px);
+}
+
+/* sizes */
+.sz-xl .tline-text{font-family:'Syne',sans-serif;font-size:clamp(3rem,8vw,6.5rem);font-weight:800;letter-spacing:-.03em;line-height:1}
+.sz-lg .tline-text{font-family:'Syne',sans-serif;font-size:clamp(1.6rem,4vw,3rem);font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.sz-md .tline-text{font-size:clamp(.8rem,1.8vw,1.1rem);font-weight:300;letter-spacing:.15em;line-height:1.5}
+.sz-sm .tline-text{font-size:clamp(.6rem,1.2vw,.78rem);font-weight:100;letter-spacing:.3em;line-height:1.8}
+
+/* color variants */
+.c-teal .tline-text{color:var(--m)}
+.c-white .tline-text{color:#e0f7f6}
+.c-dim .tline-text{color:rgba(224,247,246,.4)}
+.c-grad .tline-text span{background:linear-gradient(135deg,var(--m),var(--lav),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.c-pink .tline-text{color:var(--pink)}
+
+/* ── CURSOR blink ── */
+.cursor{
+  display:inline-block;width:2px;height:1.1em;
+  background:var(--m);margin-left:4px;vertical-align:text-bottom;
+  animation:blink .9s step-end infinite;opacity:0;
+}
+.cursor.show{opacity:1}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── PROGRESS BAR ── */
+#progress{
+  position:fixed;bottom:0;left:0;right:0;height:2px;z-index:100;
+  background:rgba(57,197,187,.1);
+}
+#prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--m),var(--lav));transition:width .3s ease}
+
+/* ── BOTTOM TAG ── */
+#bottom-tag{
+  position:fixed;bottom:24px;left:0;right:0;
+  text-align:center;font-size:.6rem;letter-spacing:.35em;
+  color:rgba(57,197,187,.25);z-index:20;
+  opacity:0;transition:opacity 1s;
+}
+#bottom-tag.show{opacity:1}
+
+/* ── ENTER OVERLAY ── */
+#enter{
+  position:fixed;inset:0;z-index:300;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  background:var(--bg);
+  transition:opacity .8s ease;
+}
+#enter.fade{opacity:0;pointer-events:none}
+#enter h1{
+  font-family:'Syne',sans-serif;font-size:clamp(1.4rem,4vw,2.6rem);font-weight:800;
+  background:linear-gradient(135deg,var(--m),var(--lav),var(--pink));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  letter-spacing:.02em;
+}
+#enter p{font-size:.7rem;letter-spacing:.3em;color:rgba(57,197,187,.5);text-transform:uppercase}
+#enter-btn{
+  margin-top:16px;padding:12px 36px;
+  border:1px solid rgba(57,197,187,.4);border-radius:2px;
+  background:none;color:var(--m);
+  font-family:'Azeret Mono',monospace;font-size:.72rem;letter-spacing:.25em;
+  cursor:pointer;transition:all .3s;text-transform:uppercase;
+}
+#enter-btn:hover{background:rgba(57,197,187,.08);border-color:var(--m);box-shadow:0 0 24px rgba(57,197,187,.2)}
+.enter-note{font-size:.55rem;color:rgba(57,197,187,.25);letter-spacing:.2em}
+
+/* ── MAIN PAGE (hidden initially) ── */
+#main-page{opacity:0;transition:opacity 1s ease;pointer-events:none;position:fixed;inset:0;z-index:5}
+#main-page.show{opacity:1;pointer-events:all}
+
+/* ── GLITCH frames ── */
+@keyframes glitch-show{
+  0%{clip-path:inset(40% 0 50% 0)}
+  20%{clip-path:inset(10% 0 80% 0)}
+  40%{clip-path:inset(70% 0 10% 0)}
+  60%{clip-path:inset(20% 0 60% 0)}
+  80%{clip-path:inset(50% 0 30% 0)}
+  100%{clip-path:inset(0% 0 0% 0)}
+}
+
+/* ── WIPE OUT ── */
+#wipe{
+  position:fixed;inset:0;z-index:400;
+  background:var(--bg);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .7s cubic-bezier(.7,0,.3,1);
+}
+#wipe.go{transform:scaleX(1)}
+#wipe.go2{transform-origin:right;transform:scaleX(0)}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<!-- Enter gate -->
+<div id="enter">
+  <p class="enter-note">✦ miku core ✦</p>
+  <h1>Deepanjali.</h1>
+  <p>a creative developer</p>
+  <button id="enter-btn">enter ↗</button>
+  <p class="enter-note">初音ミク — hatsune miku</p>
+</div>
+
+<div id="wipe"></div>
+
+<!-- Skip button -->
+<button id="skip">skip intro</button>
+
+<!-- Stage -->
+<div id="stage">
+  <div id="term-header">SYSTEM_BOOT / USER_INIT / DEEPANJALI.EXE</div>
+  <div id="lines"></div>
+</div>
+
+<div id="progress"><div id="prog-fill"></div></div>
+<div id="bottom-tag">© 2025 &nbsp;·&nbsp; deepanjali &nbsp;·&nbsp; ♪ always listening to miku ♪</div>
+
+<!-- Main page placeholder (your actual page goes here) -->
+<div id="main-page">
+  <!-- Your existing page content loads here after intro -->
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;">
+    <p style="font-family:'Syne',sans-serif;font-size:clamp(2rem,6vw,5rem);font-weight:800;background:linear-gradient(135deg,#39C5BB,#C084FC,#FF7BAC);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Deepanjali.</p>
+    <p style="font-family:'Azeret Mono',monospace;font-size:.75rem;letter-spacing:.3em;color:rgba(57,197,187,.5)">INTRO COMPLETE — MAIN PAGE LOADS HERE</p>
+  </div>
+</div>
+
+<script>
+/* ── BG canvas ── */
+const cv=document.getElementById('bg'),cx=cv.getContext('2d');
+let W,H,pts=[];
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight}
+resize();addEventListener('resize',()=>{resize();spawnPts()});
+class Pt{constructor(r=false){this.reset(r)}reset(r=false){this.x=Math.random()*W;this.y=r?Math.random()*H:H+8;this.r=Math.random()*.9+.2;this.sp=Math.random()*.35+.07;this.op=Math.random()*.45+.08;this.h=Math.random()>.55?180:Math.random()>.5?315:265}update(){this.y-=this.sp;if(this.y<-8)this.reset()}draw(){cx.beginPath();cx.arc(this.x,this.y,this.r,0,Math.PI*2);cx.fillStyle=`hsla(${this.h},75%,68%,${this.op})`;cx.fill()}}
+function spawnPts(){pts=[];const n=Math.floor(W*H/9000);for(let i=0;i<n;i++)pts.push(new Pt(true))}spawnPts();
+function drawGrid(){cx.strokeStyle='rgba(57,197,187,0.025)';cx.lineWidth=.5;const s=70;for(let x=0;x<W;x+=s){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke()}for(let y=0;y<H;y+=s){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke()}}
+function bgLoop(){cx.clearRect(0,0,W,H);const g=cx.createRadialGradient(W/2,H*.25,0,W/2,H*.25,W*.55);g.addColorStop(0,'rgba(57,197,187,0.035)');g.addColorStop(.6,'rgba(192,132,252,0.015)');g.addColorStop(1,'transparent');cx.fillStyle=g;cx.fillRect(0,0,W,H);drawGrid();pts.forEach(p=>{p.update();p.draw()});requestAnimationFrame(bgLoop)}bgLoop();
+
+/* ── SCRIPT data ── */
+const script=[
+  {label:'sys',text:'initialising...',size:'sz-sm',color:'c-teal',speed:30,pause:400},
+  {label:'',text:'',size:'sz-sm',color:'c-dim',speed:0,pause:200},
+  {label:'user',text:'DEEPANJALI',size:'sz-xl',color:'c-grad',speed:55,pause:600,glitch:true},
+  {label:'',text:'',size:'sz-sm',color:'c-dim',speed:0,pause:150},
+  {label:'role',text:'creative developer',size:'sz-lg',color:'c-white',speed:38,pause:500},
+  {label:'',text:'',size:'sz-sm',color:'c-dim',speed:0,pause:100},
+  {label:'tag',text:'ai / ml  ·  computer vision  ·  vibe architect',size:'sz-md',color:'c-teal',speed:18,pause:400},
+  {label:'',text:'',size:'sz-sm',color:'c-dim',speed:0,pause:100},
+  {label:'now',text:'building things that actually slap',size:'sz-md',color:'c-dim',speed:22,pause:500},
+  {label:'',text:'',size:'sz-sm',color:'c-dim',speed:0,pause:100},
+  {label:'♪',text:'always listening to miku',size:'sz-sm',color:'c-pink',speed:28,pause:800},
+];
+
+const linesEl=document.getElementById('lines');
+const progFill=document.getElementById('prog-fill');
+const skipBtn=document.getElementById('skip');
+const termHeader=document.getElementById('term-header');
+const bottomTag=document.getElementById('bottom-tag');
+let introRunning=false,introComplete=false;
+
+function makeLine(item){
+  const wrap=document.createElement('div');
+  wrap.className=`tline ${item.size} ${item.color}`;
+
+  if(item.label){
+    const lbl=document.createElement('span');
+    lbl.className='tline-label';
+    lbl.textContent=item.label+' >';
+    wrap.appendChild(lbl);
+  }else{
+    const spacer=document.createElement('span');
+    spacer.className='tline-label';
+    spacer.textContent='';
+    wrap.appendChild(spacer);
+  }
+
+  const txt=document.createElement('span');
+  txt.className='tline-text';
+
+  if(item.glitch){
+    const ghost=document.createElement('span');
+    ghost.className='ghost';
+    ghost.setAttribute('aria-hidden','true');
+    item.text.split('').forEach(ch=>{
+      const s=document.createElement('span');
+      s.textContent=ch===''?' ':ch;
+      ghost.appendChild(s);
+    });
+    txt.appendChild(ghost);
+  }
+
+  item.text.split('').forEach(ch=>{
+    const s=document.createElement('span');
+    s.textContent=ch===''?'\u00A0':ch;
+    txt.appendChild(s);
+  });
+
+  const cur=document.createElement('span');
+  cur.className='cursor';
+  txt.appendChild(cur);
+  wrap.appendChild(txt);
+  linesEl.appendChild(wrap);
+  return {wrap,txt,cur};
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+async function typeChars(txt,cur,speed,glitch=false){
+  const chars=[...txt.querySelectorAll('span:not(.ghost):not(.cursor)')];
+  const ghostChars=glitch?[...txt.querySelectorAll('.ghost span')]:[];
+  cur.classList.add('show');
+  for(let i=0;i<chars.length;i++){
+    chars[i].classList.add('show');
+    if(glitch&&ghostChars[i]){
+      ghostChars[i].classList.add('show');
+      setTimeout(()=>{if(ghostChars[i])ghostChars[i].style.opacity='0'},80);
+    }
+    if(speed>0)await sleep(speed+Math.random()*speed*.4);
+  }
+  cur.classList.remove('show');
+}
+
+async function runIntro(){
+  introRunning=true;
+  skipBtn.classList.add('show');
+  termHeader.classList.add('show');
+  await sleep(400);
+
+  for(let i=0;i<script.length;i++){
+    if(!introRunning)return;
+    const item=script[i];
+    const prog=Math.round(((i+1)/script.length)*100);
+    progFill.style.width=prog+'%';
+
+    if(!item.text){
+      const spacer=document.createElement('div');
+      spacer.style.height='12px';
+      linesEl.appendChild(spacer);
+      await sleep(item.pause);
+      continue;
+    }
+
+    const {wrap,txt,cur}=makeLine(item);
+    await sleep(60);
+    wrap.classList.add('in');
+    await sleep(80);
+    await typeChars(txt,cur,item.speed,!!item.glitch);
+    await sleep(item.pause);
+  }
+
+  await sleep(300);
+  bottomTag.classList.add('show');
+  await sleep(1000);
+  finishIntro();
+}
+
+function finishIntro(){
+  introComplete=true;
+  introRunning=false;
+  skipBtn.classList.remove('show');
+  // wipe transition to main page
+  const wipe=document.getElementById('wipe');
+  wipe.classList.add('go');
+  setTimeout(()=>{
+    document.getElementById('stage').style.opacity='0';
+    document.getElementById('main-page').classList.add('show');
+    wipe.classList.add('go2');
+  },750);
+}
+
+/* ── SKIP ── */
+skipBtn.addEventListener('click',()=>{
+  introRunning=false;
+  linesEl.innerHTML='';
+  finishIntro();
+});
+
+/* ── ENTER ── */
+document.getElementById('enter-btn').addEventListener('click',()=>{
+  const enterEl=document.getElementById('enter');
+  enterEl.classList.add('fade');
+  setTimeout(()=>{enterEl.style.display='none';runIntro()},800);
+});
+</script>
+</body>
+</html> 
